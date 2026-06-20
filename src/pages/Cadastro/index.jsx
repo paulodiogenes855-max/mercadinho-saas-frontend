@@ -1,4 +1,4 @@
-// Arquivo: frontend/src/pages/Cadastro/index.jsx
+// Ficheiro: frontend/src/pages/Cadastro/index.jsx
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Store, Mail, Lock, Users, CreditCard, QrCode, ArrowRight, CheckCircle, ChevronLeft } from 'lucide-react';
@@ -40,14 +40,10 @@ export default function Cadastro() {
             setCarregando(true);
             setErro('');
 
-            // 1. Cria a conta do dono da loja no Firebase de forma segura
+            // 1. Cria a conta no Firebase
             const credenciais = await createUserWithEmailAndPassword(auth, loja.email, loja.senha);
             
-            // 2. Pega o Token do Firebase para autorizar no Backend
-            const token = await credenciais.user.getIdToken();
-            
-            // 3. Envia os dados para o seu Backend (Render) para criar o Banco de Dados da Loja
-            // O interceptor do api.js já vai colocar o token automaticamente!
+            // 2. Envia os dados para o seu Backend criar a cobrança
             const resposta = await api.post('/lojas', {
                 nome_loja: loja.nomeLoja,
                 tamanho_equipe: loja.funcionarios,
@@ -55,16 +51,14 @@ export default function Cadastro() {
                 metodo_pagamento: pagamento.metodo
             });
 
-            // 4. Lógica de Pagamento (Mercado Pago)
-            if (pagamento.metodo === 'PIX') {
-                // Aqui o backend já vai devolver o código PIX Copia e Cola
-                alert(`Sucesso! Bem-vindo ao Meu Mercadinho.\\n\\nPara ativar sua loja, pague o Pix gerado no seu e-mail!`);
+            // 3. REDIRECIONA PARA O MERCADO PAGO (CHECKOUT PRO)
+            if (resposta.data.url_pagamento) {
+                // Sai do seu site e abre a tela segura de pagamento do Mercado Pago
+                window.location.href = resposta.data.url_pagamento;
             } else {
-                alert(`Sucesso! Bem-vindo ao Meu Mercadinho.\\n\\nO seu cartão será processado pelo Mercado Pago.`);
+                // Plano B caso algo falhe
+                navigate('/dashboard');
             }
-
-            // Manda o usuário feliz da vida para o Dashboard dele!
-            navigate('/dashboard');
 
         } catch (error) {
             console.error("Erro no cadastro:", error);
@@ -73,8 +67,7 @@ export default function Cadastro() {
             } else {
                 setErro("Ocorreu um erro ao criar a loja. Tente novamente.");
             }
-        } finally {
-            setCarregando(false);
+            setCarregando(false); // Só desativa o loading se der erro. Se der certo, ele muda de página.
         }
     };
 
@@ -408,7 +401,6 @@ const styles = {
         fontWeight: '600',
         marginBottom: '15px',
     },
-    // Estilos Etapa 2 (Radios)
     labelRadio: {
         display: 'flex',
         alignItems: 'flex-start',
@@ -428,7 +420,6 @@ const styles = {
         display: 'flex',
         flexDirection: 'column',
     },
-    // Estilos Etapa 3 (Pagamento)
     selecaoPlano: {
         display: 'flex',
         gap: '10px',
