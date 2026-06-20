@@ -1,0 +1,25 @@
+# Dependências (Pastas pesadas que o comando npm instala)
+node_modules/
+/.pnp
+.pnp.js
+
+# Variáveis de ambiente (Bloqueia totalmente o seu .env de ir para o GitHub!)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Pastas de Build / Produção
+dist/
+build/
+
+# Arquivos temporários do sistema ou do editor de código
+.DS_Store
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

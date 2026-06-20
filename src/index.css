@@ -1,0 +1,111 @@
+/* Arquivo: frontend/src/index.css */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+:root {
+  /* Paleta inspirada em apps modernos (tons laranjas e fundos claros) */
+  --cor-primaria: #FF7A00; 
+  --cor-primaria-escura: #E06B00;
+  --cor-fundo: #F5F6F8;
+  --cor-texto: #333333;
+  --cor-texto-secundario: #7A7A7A;
+  --cor-branco: #FFFFFF;
+  --sombra-suave: 0 4px 12px rgba(0, 0, 0, 0.05);
+  --sombra-reversa: 0 -4px 12px rgba(0, 0, 0, 0.05);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: 'Inter', sans-serif;
+}
+
+body {
+  background-color: var(--cor-fundo);
+  color: var(--cor-texto);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* O container principal força o formato de aplicativo */
+.app-layout {
+  display: flex;
+  flex-direction: column;
+  height: 100vh; /* Ocupa 100% da altura da tela */
+  height: 100dvh; /* Adapta-se a barras de navegação mobile */
+  overflow: hidden;
+}
+
+/* Painel Superior (Header) */
+.header-superior {
+  background-color: var(--cor-primaria);
+  color: var(--cor-branco);
+  padding: 1.2rem 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom-left-radius: 16px;
+  border-bottom-right-radius: 16px;
+  box-shadow: var(--sombra-suave);
+  z-index: 10;
+}
+
+.header-info h1 {
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.header-info p {
+  font-size: 0.85rem;
+  opacity: 0.9;
+}
+
+.foto-perfil {
+  width: 45px;
+  height: 45px;
+  border-radius: 50%;
+  border: 2px solid var(--cor-branco);
+  object-fit: cover;
+}
+
+/* Área de Conteúdo Central (onde as telas renderizam) */
+.conteudo-principal {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1.5rem;
+  padding-bottom: 2rem;
+}
+
+/* Menu Inferior (Bottom Navigation) */
+.menu-inferior {
+  background-color: var(--cor-branco);
+  display: flex;
+  justify-content: space-around;
+  padding: 0.8rem 0;
+  box-shadow: var(--sombra-reversa);
+  border-top-left-radius: 20px;
+  border-top-right-radius: 20px;
+  z-index: 10;
+}
+
+.item-menu {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-decoration: none;
+  color: var(--cor-texto-secundario);
+  font-size: 0.75rem;
+  font-weight: 500;
+  gap: 4px;
+  transition: color 0.2s;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.item-menu.ativo {
+  color: var(--cor-primaria);
+}
+
+.item-menu:hover {
+  color: var(--cor-primaria-escura);
+}
