@@ -1,2 +1,26 @@
 {
+  "name": "Meu Mercadinho - Gestão e PDV",
+  "short_name": "Mercadinho",
+  "description": "Sistema completo de gestão de estoque e PDV inteligente.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "theme_color": "#FF7A00",
+  "background_color": "#F5F6F8",
+  "lang": "pt-BR",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "48x48 72x72 96x96 128x128 144x144 152x152 192x192 384x384 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon.svg",
+      "sizes": "48x48 72x72 96x96 128x128 144x144 152x152 192x192 384x384 512x512",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
 }
