@@ -1,26 +1,40 @@
 // Arquivo: frontend/src/pages/Produtos/index.jsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Search, Upload, Plus, AlertTriangle, Package } from 'lucide-react';
-
-const produtosMock = [
-    { id: 1, codigo_barras: '7891000', descricao: 'Arroz Branco Tio João 5kg', preco_custo: 18.50, preco_venda: 24.90, estoque_atual: 42, estoque_minimo: 10 },
-    { id: 2, codigo_barras: '7892000', descricao: 'Feijão Carioca 1kg', preco_custo: 6.00, preco_venda: 8.50, estoque_atual: 7, estoque_minimo: 15 }, // Alerta de Estoque Baixo
-    { id: 3, codigo_barras: '7893000', descricao: 'Óleo de Soja Soya 900ml', preco_custo: 5.20, preco_venda: 6.99, estoque_atual: 85, estoque_minimo: 20 },
-    { id: 4, codigo_barras: '7894000', descricao: 'Açúcar Refinado União 1kg', preco_custo: 3.10, preco_venda: 4.50, estoque_atual: 4, estoque_minimo: 12 }, // Alerta de Estoque Baixo
-    { id: 5, codigo_barras: '7895000', descricao: 'Café Melitta 500g', preco_custo: 12.80, preco_venda: 16.90, estoque_atual: 30, estoque_minimo: 8 },
-];
+import api from '../../services/api'; // Importamos a nossa ponte para o Backend!
 
 export default function Produtos() {
     const [busca, setBusca] = useState('');
+    const [produtos, setProdutos] = useState([]); // Agora começa vazio!
+    const [carregando, setCarregando] = useState(true);
+
+    // Assim que a tela abrir, ele roda essa função para buscar os dados no banco
+    useEffect(() => {
+        carregarProdutos();
+    }, []);
+
+    const carregarProdutos = async () => {
+        try {
+            setCarregando(true);
+            // Faz um GET na rota do backend (que já identifica o dono da loja automaticamente)
+            const resposta = await api.get('/produtos');
+            setProdutos(resposta.data);
+        } catch (error) {
+            console.error("Erro ao buscar produtos:", error);
+            // Não exibiremos um alerta invasivo, apenas deixamos a lista vazia
+        } finally {
+            setCarregando(false);
+        }
+    };
 
     // Filtra a lista de produtos baseada no que o usuário digita
-    const produtosFiltrados = produtosMock.filter(p => 
-        p.descricao.toLowerCase().includes(busca.toLowerCase()) || p.codigo_barras.includes(busca)
+    const produtosFiltrados = produtos.filter(p => 
+         p.descricao.toLowerCase().includes(busca.toLowerCase()) || p.codigo_barras.includes(busca)
     );
 
     // Simulação da leitura da planilha pelo frontend
     const lidarComImportacaoCSV = (e) => {
-        alert("Simulação: Planilha lida com sucesso pelo navegador! Transformando dados em JSON para enviar ao banco de dados.");
+        alert("A importação de planilha está em construção. Em breve conectaremos esta função à API!");
     };
 
     return (
@@ -34,9 +48,9 @@ export default function Produtos() {
                     <div style={styles.inputBuscaContainer}>
                         <Search size={20} color="#7A7A7A" style={{ marginLeft: 12 }} />
                         <input 
-                            style={styles.inputBusca} 
-                            placeholder="Pesquisar no estoque..." 
-                            value={busca}
+                             style={styles.inputBusca} 
+                             placeholder="Pesquisar no estoque..." 
+                             value={busca}
                             onChange={(e) => setBusca(e.target.value)}
                         />
                     </div>
@@ -45,11 +59,11 @@ export default function Produtos() {
                     <label style={styles.btnUploadCSV}>
                         <Upload size={20} color="#FF7A00" />
                         <input 
-                            type="file" 
-                            accept=".csv" 
-                            style={{ display: 'none' }} 
-                            onChange={lidarComImportacaoCSV} 
-                        />
+                             type="file" 
+                             accept=".csv" 
+                             style={{ display: 'none' }} 
+                             onChange={lidarComImportacaoCSV} 
+                         />
                     </label>
                 </div>
             </div>
@@ -61,8 +75,10 @@ export default function Produtos() {
                 <h3 style={styles.tituloLista}>Produtos Cadastrados ({produtosFiltrados.length})</h3>
                 
                 <div style={styles.listaProdutos}>
-                    {produtosFiltrados.length === 0 ? (
-                        <div style={styles.estoqueVazio}>Nenhum produto encontrado.</div>
+                    {carregando ? (
+                        <div style={styles.estoqueVazio}>A carregar o estoque da nuvem...</div>
+                    ) : produtosFiltrados.length === 0 ? (
+                        <div style={styles.estoqueVazio}>Nenhum produto cadastrado no momento.</div>
                     ) : (
                         produtosFiltrados.map((prod) => {
                             const estoqueBaixo = prod.estoque_atual <= prod.estoque_minimo;
@@ -88,7 +104,7 @@ export default function Produtos() {
                                         <div style={styles.blocoPreco}>
                                             <span style={styles.labelPreco}>Custo / Venda</span>
                                             <span style={styles.valoresTexto}>
-                                                R$ {prod.preco_custo.toFixed(2)} → <strong style={{color: '#333'}}>R$ {prod.preco_venda.toFixed(2)}</strong>
+                                                R$ {Number(prod.preco_custo).toFixed(2)} / <strong style={{color: '#333'}}>R$ {Number(prod.preco_venda).toFixed(2)}</strong>
                                             </span>
                                         </div>
                                         
@@ -110,7 +126,7 @@ export default function Produtos() {
                 BLOCO 3: RODAPÉ FIXO (Botão de Cadastro Estático)
             ========================================== */}
             <div style={styles.rodapeFixo}>
-                <button style={styles.btnNovoProduto}>
+                <button style={styles.btnNovoProduto} onClick={() => alert("Em breve: Abertura do formulário de criação.")}>
                     <Plus size={20} style={{ marginRight: 8 }} />
                     Cadastrar Produto Manual
                 </button>

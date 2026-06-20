@@ -3,11 +3,11 @@ import React, { useState } from 'react';
 import { Store, Mail, Lock } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-// Importamos a mágica do Firebase
+// Importamos a magia do Firebase (Agora com signInWithEmailAndPassword adicionado!)
 import { auth, googleProvider } from '../../config/firebase';
-import { signInWithPopup } from 'firebase/auth';
+import { signInWithPopup, signInWithEmailAndPassword } from 'firebase/auth';
 
-// O Ícone do Google em SVG direto no código (nunca mais quebra a imagem!)
+// O Ícone do Google em SVG direto no código
 const GoogleIcon = () => (
   <svg width="24" height="24" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
     <path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"/>
@@ -21,13 +21,32 @@ export default function Login() {
     const navigate = useNavigate();
     const [erro, setErro] = useState('');
     const [carregando, setCarregando] = useState(false);
+    
+    // NOVOS ESTADOS: Para capturar o que o utilizador escreve
+    const [email, setEmail] = useState('');
+    const [senha, setSenha] = useState('');
 
-    const fazerLoginManual = (e) => {
+    // FUNÇÃO ATUALIZADA: Agora faz a verificação real no banco de dados!
+    const fazerLoginManual = async (e) => {
         e.preventDefault();
-        navigate('/dashboard'); 
+        setCarregando(true);
+        setErro('');
+        
+        try {
+            // Tenta validar as credenciais no Firebase
+            await signInWithEmailAndPassword(auth, email, senha);
+            
+            console.log("Sucesso! O utilizador entrou com E-mail e Palavra-Passe.");
+            navigate('/dashboard'); 
+            
+        } catch (error) {
+            console.error("Erro no login manual:", error);
+            setErro('E-mail ou palavra-passe incorretos. Tente novamente.');
+        } finally {
+            setCarregando(false);
+        }
     };
 
-    // Função real do Firebase
     const fazerLoginComGoogle = async () => {
         setCarregando(true);
         setErro('');
@@ -36,14 +55,12 @@ export default function Login() {
             const resultado = await signInWithPopup(auth, googleProvider);
             const usuario = resultado.user;
             
-            console.log("Sucesso! O Firebase logou o usuário:", usuario.displayName);
-            
-            // Redireciona para o sistema
+            console.log("Sucesso! O Firebase logou o utilizador:", usuario.displayName);
             navigate('/dashboard');
             
         } catch (error) {
             console.error("Erro no login com Google:", error);
-            setErro('Falha ao conectar com o Google. Verifique se o provedor está ativado no Firebase.');
+            setErro('Falha ao conectar com o Google. Verifique a sua ligação.');
         } finally {
             setCarregando(false);
         }
@@ -69,6 +86,8 @@ export default function Login() {
                             type="email" 
                             placeholder="O seu e-mail" 
                             style={styles.input}
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
                             required
                         />
                     </div>
@@ -79,12 +98,14 @@ export default function Login() {
                             type="password" 
                             placeholder="A sua palavra-passe" 
                             style={styles.input}
+                            value={senha}
+                            onChange={(e) => setSenha(e.target.value)}
                             required
                         />
                     </div>
 
-                    <button type="submit" style={styles.btnPrimario}>
-                        Entrar com Senha
+                    <button type="submit" style={styles.btnPrimario} disabled={carregando}>
+                        {carregando ? 'A entrar...' : 'Entrar com Senha'}
                     </button>
                 </form>
 
@@ -94,7 +115,6 @@ export default function Login() {
                     <span style={styles.linha}></span>
                 </div>
 
-                {/* Agora o botão CHAMA a função fazerLoginComGoogle */}
                 <button 
                     style={{...styles.btnGoogle, opacity: carregando ? 0.7 : 1}} 
                     type="button"
@@ -102,7 +122,7 @@ export default function Login() {
                     disabled={carregando}
                 >
                     <GoogleIcon />
-                    {carregando ? 'Conectando...' : 'Continuar com o Google'}
+                    {carregando ? 'A conectar...' : 'Continuar com o Google'}
                 </button>
 
                 <div style={styles.rodape}>

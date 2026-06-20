@@ -1,12 +1,7 @@
 // Arquivo: frontend/src/pages/PDV/index.jsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Camera, Search, Plus, Trash2, QrCode, CreditCard, Banknote } from 'lucide-react';
-
-const estoqueMock = [
-    { id: 1, codigo: '7891000', descricao: 'Arroz Branco Tio João 5kg', custo: 18.50, venda: 24.90 },
-    { id: 2, codigo: '7892000', descricao: 'Feijão Carioca 1kg', custo: 6.00, venda: 8.50 },
-    { id: 3, codigo: '7893000', descricao: 'Óleo de Soja Soya 900ml', custo: 5.20, venda: 6.99 },
-];
+import api from '../../services/api'; // Importamos a nossa ligação à base de dados
 
 export default function PDV() {
     const [carrinho, setCarrinho] = useState([]);
@@ -15,16 +10,51 @@ export default function PDV() {
     const [quantidadeInput, setQuantidadeInput] = useState(1);
     const [precoVendaInput, setPrecoVendaInput] = useState(0);
     const [metodoPagamento, setMetodoPagamento] = useState('');
+    
+    // Novos estados para a API
+    const [estoque, setEstoque] = useState([]);
+    const [processandoVenda, setProcessandoVenda] = useState(false);
 
-    const buscarProduto = (texto) => {
-        setBusca(texto);
-        const encontrado = estoqueMock.find(p => p.codigo === texto || p.descricao.toLowerCase().includes(texto.toLowerCase()));
+    // Carrega o stock real quando a página abre
+    useEffect(() => {
+        carregarEstoque();
+    }, []);
+
+    const carregarEstoque = async () => {
+        try {
+            const resposta = await api.get('/produtos');
+            setEstoque(resposta.data);
+        } catch (error) {
+            console.error("Erro ao carregar stock para o PDV:", error);
+        }
+    };
+
+    // Agora a busca é feita no nosso stock REAL
+    const buscarProduto = (textoBusca) => {
+        if (!textoBusca) return;
+        
+        const encontrado = estoque.find(p => 
+            p.codigo_barras === textoBusca || 
+            p.descricao.toLowerCase().includes(textoBusca.toLowerCase())
+        );
+        
         if (encontrado) {
             setProdutoAtual(encontrado);
-            setPrecoVendaInput(encontrado.venda);
+            setPrecoVendaInput(encontrado.preco_venda); // Usa o preço de venda real da BD
             setQuantidadeInput(1);
         } else {
+            alert('Produto não encontrado no stock!');
             setProdutoAtual(null);
+        }
+        
+        // Limpa a busca para o próximo bip do leitor de código de barras
+        setBusca('');
+    };
+
+    // Lida com a tecla "Enter" do Leitor de Código de Barras
+    const lidarComTecla = (e) => {
+        if (e.key === 'Enter') {
+            buscarProduto(busca);
         }
     };
 
@@ -33,42 +63,78 @@ export default function PDV() {
 
         const novoItem = {
             ...produtoAtual,
-            id_venda: Date.now(),
+            id_carrinho: crypto.randomUUID(), // Segurança anti-colisão de lasers rápidos
             quantidade: parseFloat(quantidadeInput),
             precoVendido: parseFloat(precoVendaInput),
             subtotal: parseFloat(quantidadeInput) * parseFloat(precoVendaInput)
         };
 
         setCarrinho([novoItem, ...carrinho]); 
-        setBusca('');
         setProdutoAtual(null);
         setQuantidadeInput(1);
         setPrecoVendaInput(0);
     };
 
-    const removerItem = (id_venda) => {
-        setCarrinho(carrinho.filter(item => item.id_venda !== id_venda));
+    const removerItem = (id_carrinho) => {
+        setCarrinho(carrinho.filter(item => item.id_carrinho !== id_carrinho));
     };
 
     const totalVenda = carrinho.reduce((acc, item) => acc + item.subtotal, 0);
+
+    // A MÁGICA: Envia a venda para a nuvem
+    const finalizarVenda = async () => {
+        if (carrinho.length === 0 || !metodoPagamento) return;
+        
+        try {
+            setProcessandoVenda(true);
+            
+            // Dispara a venda para a nossa API no Render
+            await api.post('/vendas', {
+                itens: carrinho.map(item => ({
+                    produto_id: item.id,
+                    quantidade: item.quantidade,
+                    preco_unitario: item.precoVendido,
+                    subtotal: item.subtotal
+                })),
+                metodoPagamento: metodoPagamento,
+                total: totalVenda
+            });
+            
+            alert('Venda finalizada com sucesso!');
+            
+            // Limpa o balcão para o próximo cliente
+            setCarrinho([]);
+            setMetodoPagamento('');
+            
+            // Opcional: Atualiza o stock em segundo plano para manter as quantidades certas
+            carregarEstoque();
+            
+        } catch (error) {
+            console.error("Erro ao finalizar a venda:", error);
+            alert('Ocorreu um erro ao registar a venda. Tente novamente.');
+        } finally {
+            setProcessandoVenda(false);
+        }
+    };
 
     return (
         <div style={styles.telaTravada}>
             
             {/* ==========================================
-                BLOCO 1: TOPO FIXO (Não se move)
+                BLOCO 1: TOPO FIXO
             ========================================== */}
             <div style={styles.topoFixo}>
                 <div style={styles.inputBuscaContainer}>
                     <Search size={20} color="#7A7A7A" style={{ marginLeft: 12 }} />
                     <input 
                         style={styles.inputBusca} 
-                        placeholder="Buscar ou bipar..." 
+                        placeholder="Pesquisar ou Bipar código (pressione Enter)..." 
                         value={busca}
-                        onChange={(e) => buscarProduto(e.target.value)}
+                        onChange={(e) => setBusca(e.target.value)}
+                        onKeyDown={lidarComTecla} // AQUI ESTÁ A TRAVA DO LEITOR DE CÓDIGOS
                     />
-                    <button style={styles.btnCamera}>
-                        <Camera size={20} color="#FFF" />
+                    <button style={styles.btnCamera} onClick={() => buscarProduto(busca)}>
+                        <Search size={20} color="#FFF" />
                     </button>
                 </div>
 
@@ -76,7 +142,7 @@ export default function PDV() {
                     <div style={styles.cardAdicionar}>
                         <div style={styles.infoProdutoTopo}>
                             <h4 style={styles.nomeProduto}>{produtoAtual.descricao}</h4>
-                            <span style={styles.tagCusto}>Custo: R$ {produtoAtual.custo.toFixed(2)}</span>
+                            <span style={styles.tagCusto}>Custo: R$ {Number(produtoAtual.preco_custo).toFixed(2)}</span>
                         </div>
                         
                         <div style={styles.linhaInputsMobile}>
@@ -107,17 +173,17 @@ export default function PDV() {
             </div>
 
             {/* ==========================================
-                BLOCO 2: ÁREA DE ROLAGEM INTERNA (Ocupa o espaço que sobrar)
+                BLOCO 2: ÁREA DE ROLAGEM (CARRINHO)
             ========================================== */}
             <div style={styles.areaRolagemInterna}>
-                <h3 style={styles.tituloLista}>Itens ({carrinho.length})</h3>
+                <h3 style={styles.tituloLista}>Itens na Caixa ({carrinho.length})</h3>
                 
                 <div style={styles.listaProdutos}>
                     {carrinho.length === 0 ? (
                         <div style={styles.carrinhoVazio}>Aguardando itens...</div>
                     ) : (
                         carrinho.map((item) => (
-                            <div key={item.id_venda} style={styles.cartItem}>
+                            <div key={item.id_carrinho} style={styles.cartItem}>
                                 <div style={styles.cartItemDados}>
                                     <span style={styles.cartItemNome}>{item.descricao}</span>
                                     <span style={styles.cartItemDetalhe}>
@@ -126,7 +192,7 @@ export default function PDV() {
                                 </div>
                                 <div style={styles.cartItemAcoes}>
                                     <strong style={styles.cartItemSubtotal}>R$ {item.subtotal.toFixed(2)}</strong>
-                                    <button style={styles.btnLixeira} onClick={() => removerItem(item.id_venda)}>
+                                    <button style={styles.btnLixeira} onClick={() => removerItem(item.id_carrinho)}>
                                         <Trash2 size={20} color="#FF4D4D" />
                                     </button>
                                 </div>
@@ -137,7 +203,7 @@ export default function PDV() {
             </div>
 
             {/* ==========================================
-                BLOCO 3: RODAPÉ FIXO (Intocável na base do celular)
+                BLOCO 3: RODAPÉ FIXO DE PAGAMENTO
             ========================================== */}
             <div style={styles.rodapeFixo}>
                 <div style={styles.botoesPagamento}>
@@ -163,7 +229,7 @@ export default function PDV() {
 
                 {metodoPagamento === 'PIX' && (
                     <div style={styles.alertaPix}>
-                        <span>Chave CNPJ: 00.000.000/0001-00</span>
+                        <span>Chave Pix: O seu CNPJ / Telemóvel aqui</span>
                     </div>
                 )}
 
@@ -173,10 +239,14 @@ export default function PDV() {
                         <span style={styles.valorTotal}>R$ {totalVenda.toFixed(2)}</span>
                     </div>
                     <button 
-                        style={{...styles.btnFinalizar, opacity: carrinho.length > 0 && metodoPagamento ? 1 : 0.5}}
-                        disabled={carrinho.length === 0 || !metodoPagamento}
+                        style={{
+                            ...styles.btnFinalizar, 
+                            opacity: (carrinho.length > 0 && metodoPagamento && !processandoVenda) ? 1 : 0.5
+                        }}
+                        disabled={carrinho.length === 0 || !metodoPagamento || processandoVenda}
+                        onClick={finalizarVenda}
                     >
-                        Cobrar
+                        {processandoVenda ? 'A processar...' : 'Cobrar'}
                     </button>
                 </div>
             </div>
@@ -188,16 +258,14 @@ export default function PDV() {
 // ESTILOS: ESTRUTURA RÍGIDA E ERGONÔMICA
 // ==========================================
 const styles = {
-    // 1. TELA TRAVADA: Ocupa toda a altura, esconde rolagem global
     telaTravada: {
         display: 'flex',
         flexDirection: 'column',
         height: '100%', 
-        maxHeight: 'calc(100dvh - 140px)', // Desconta o header laranja e o menu inferior do layout principal
+        maxHeight: 'calc(100dvh - 140px)', 
         backgroundColor: '#F5F6F8',
         overflow: 'hidden', 
     },
-    // 2. TOPO FIXO: Não encolhe (flexShrink: 0)
     topoFixo: {
         flexShrink: 0,
         display: 'flex',
@@ -296,7 +364,6 @@ const styles = {
         justifyContent: 'center',
         cursor: 'pointer',
     },
-    // 3. ÁREA DE ROLAGEM INTERNA: Estica (flex: 1) e rola
     areaRolagemInterna: {
         flex: 1, 
         overflowY: 'auto', 
@@ -361,8 +428,8 @@ const styles = {
         background: 'none',
         border: 'none',
         padding: '4px',
+        cursor: 'pointer',
     },
-    // 4. RODAPÉ FIXO: Não encolhe (flexShrink: 0)
     rodapeFixo: {
         flexShrink: 0,
         backgroundColor: '#FFF',
@@ -390,6 +457,7 @@ const styles = {
         fontSize: '0.8rem',
         fontWeight: '700',
         transition: 'all 0.2s',
+        cursor: 'pointer',
     },
     alertaPix: {
         textAlign: 'center',
@@ -429,5 +497,6 @@ const styles = {
         fontSize: '1rem',
         fontWeight: '700',
         boxShadow: '0 4px 12px rgba(255, 122, 0, 0.3)',
+        cursor: 'pointer',
     }
 };
