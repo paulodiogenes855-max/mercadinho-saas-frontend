@@ -1,4 +1,5 @@
 // Ficheiro: frontend/src/App.jsx
+import Cadastro from './pages/Cadastro';
 import RotaPrivada from './components/RotaPrivada';
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
@@ -18,7 +19,7 @@ export default function App() {
                 {/* Rota Pública */}
                 <Route path="/login" element={<Login />} />
                 <Route path="/" element={<Navigate to="/login" replace />} />
-                
+                <Route path="/cadastro" element={<Cadastro />} />
                 {/* Rotas Protegidas (Dentro do LayoutBase) */}
                 <Route path="/dashboard" element={<LayoutBase><Dashboard /></LayoutBase>} />
                 <Route path="/pdv" element={<LayoutBase><PDV /></LayoutBase>} />

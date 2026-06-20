@@ -126,7 +126,15 @@ export default function Login() {
                 </button>
 
                 <div style={styles.rodape}>
-                    <p>Ainda não tem uma conta? <a href="#" style={styles.link}>Criar loja</a></p>
+                    <p>
+                        Ainda não tem uma conta?{' '}
+                        <span 
+                            onClick={() => navigate('/cadastro')} 
+                            style={{...styles.link, cursor: 'pointer'}}
+                        >
+                            Criar loja
+                        </span>
+                    </p>
                 </div>
             </div>
         </div>
