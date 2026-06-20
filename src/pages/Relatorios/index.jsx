@@ -1,336 +1,347 @@
 // Arquivo: frontend/src/pages/Relatorios/index.jsx
-import React, { useState } from 'react';
-import { Calendar, FileText, Download, DollarSign, CalendarDays, Clock } from 'lucide-react';
-
-// ==========================================
-// DADOS HISTÓRICOS (MOCK) DE VENDAS
-// ==========================================
-const historicoVendasMock = [
-    { id: 'VND-1024', horario: '19:22', funcionario: 'Carlos Souza', metodo: 'PIX', valor: 45.90 },
-    { id: 'VND-1023', horario: '18:45', funcionario: 'Ana Costa', metodo: 'CARTÃO', valor: 124.50 },
-    { id: 'VND-1022', horario: '18:10', funcionario: 'Carlos Souza', metodo: 'DINHEIRO', valor: 18.20 },
-    { id: 'VND-1021', horario: '17:05', funcionario: 'Marcos Lima', metodo: 'PIX', valor: 89.90 },
-    { id: 'VND-1020', horario: '16:30', funcionario: 'Ana Costa', metodo: 'CARTÃO', valor: 210.00 },
-    { id: 'VND-1019', horario: '15:15', funcionario: 'Carlos Souza', metodo: 'DINHEIRO', valor: 7.50 },
-    { id: 'VND-1018', horario: '14:02', funcionario: 'Marcos Lima', metodo: 'PIX', valor: 54.30 },
-];
-
-const metodosResumoMock = [
-    { metodo: 'Pix', valor: 1250.00, cor: '#00B4D8' },
-    { metodo: 'Cartão de Crédito/Débito', valor: 1980.50, cor: '#FF7A00' },
-    { metodo: 'Dinheiro em Caixa', valor: 640.00, cor: '#00C853' },
-];
+import React, { useState, useEffect } from 'react';
+import { TrendingUp, CreditCard, Banknote, QrCode, AlertTriangle, FileText, Calendar } from 'lucide-react';
+import api from '../../services/api';
 
 export default function Relatorios() {
-    const [periodo, setPeriodo] = useState('hoje');
+    const [vendas, setVendas] = useState([]);
+    const [produtos, setProdutos] = useState([]);
+    const [carregando, setCarregando] = useState(true);
+
+    // Quando a página carrega, vai à API buscar as vendas reais e os produtos
+    useEffect(() => {
+        carregarDados();
+    }, []);
+
+    const carregarDados = async () => {
+        try {
+            setCarregando(true);
+            const [respostaVendas, respostaProdutos] = await Promise.all([
+                api.get('/vendas').catch(() => ({ data: [] })),
+                api.get('/produtos').catch(() => ({ data: [] }))
+            ]);
+
+            setVendas(respostaVendas.data || []);
+            setProdutos(respostaProdutos.data || []);
+        } catch (error) {
+            console.error("Erro ao carregar relatórios:", error);
+        } finally {
+            setCarregando(false);
+        }
+    };
+
+    // ==========================================
+    // CÁLCULOS DOS DADOS REAIS
+    // ==========================================
+    
+    // 1. Total Faturado
+    const totalFaturado = vendas.reduce((acc, venda) => acc + Number(venda.total_bruto), 0);
+    
+    // 2. Ticket Médio (Média gasta por cliente)
+    const ticketMedio = vendas.length > 0 ? (totalFaturado / vendas.length) : 0;
+
+    // 3. Contagem por Método de Pagamento
+    const pagamentos = vendas.reduce((acc, venda) => {
+        const metodo = venda.metodo_pagamento;
+        acc[metodo] = (acc[metodo] || 0) + Number(venda.total_bruto);
+        return acc;
+    }, {});
+
+    // 4. Produtos com Estoque Baixo
+    const estoqueBaixo = produtos.filter(p => p.estoque_atual <= p.estoque_minimo);
+
+    // ==========================================
+    // RENDERIZAÇÃO
+    // ==========================================
+    if (carregando) {
+        return (
+            <div style={styles.telaTravada}>
+                <div style={styles.centro}>A carregar relatórios do sistema...</div>
+            </div>
+        );
+    }
 
     return (
         <div style={styles.telaTravada}>
             
-            {/* ==========================================
-                BLOCO 1: TOPO FIXO (Filtros de Período e Exportação)
-            ========================================== */}
             <div style={styles.topoFixo}>
-                <div style={styles.linhaFiltros}>
-                    <button 
-                        style={{...styles.btnFiltro, backgroundColor: periodo === 'hoje' ? '#FF7A00' : '#FFF', color: periodo === 'hoje' ? '#FFF' : '#7A7A7A'}}
-                        onClick={() => setPeriodo('hoje')}
-                    >
-                        Hoje
-                    </button>
-                    <button 
-                        style={{...styles.btnFiltro, backgroundColor: periodo === '7dias' ? '#FF7A00' : '#FFF', color: periodo === '7dias' ? '#FFF' : '#7A7A7A'}}
-                        onClick={() => setPeriodo('7dias')}
-                    >
-                        7 Dias
-                    </button>
-                    <button 
-                        style={{...styles.btnFiltro, backgroundColor: periodo === '30dias' ? '#FF7A00' : '#FFF', color: periodo === '30dias' ? '#FFF' : '#7A7A7A'}}
-                        onClick={() => setPeriodo('30dias')}
-                    >
-                        30 Dias
-                    </button>
-                </div>
-
-                {/* Card de Faturamento Consolidado do Filtro */}
-                <div style={styles.cardFaturamento}>
-                    <div style={styles.blocoFaturamentoTexto}>
-                        <span style={styles.labelFaturamento}>Faturamento Bruto Retido</span>
-                        <h2 style={styles.valorFaturamento}>R$ 3.870,50</h2>
-                    </div>
-                    <div style={styles.iconeFundoDolar}>
-                        <DollarSign size={24} color="#FFF" />
-                    </div>
-                </div>
+                <h2 style={styles.tituloSecao}>Relatórios e Gestão</h2>
+                <p style={styles.subtitulo}>Histórico das últimas 50 vendas e alertas.</p>
             </div>
 
-            {/* ==========================================
-                BLOCO 2: ÁREA DE ROLAGEM INTERNA (Fechamento e Auditoria)
-            ========================================== */}
             <div style={styles.areaRolagemInterna}>
                 
-                {/* Divisão por Meio de Pagamento */}
-                <div style={styles.cardGestao}>
-                    <h4 style={styles.tituloPainel}>Entradas por Meio de Pagamento</h4>
-                    <div style={styles.listaMetodos}>
-                        {metodosResumoMock.map((item, idx) => (
-                            <div key={idx} style={styles.linhaMetodo}>
-                                <div style={styles.metodoIdentificador}>
-                                    <span style={{...styles.indicadorCor, backgroundColor: item.cor}}></span>
-                                    <span style={styles.nomeMetodo}>{item.metodo}</span>
-                                </div>
-                                <strong style={styles.valorMetodo}>R$ {item.valor.toFixed(2)}</strong>
-                            </div>
-                        ))}
+                {/* BLOCO 1: VISÃO GERAL (Ticket e Faturamento) */}
+                <div style={styles.gridDuplo}>
+                    <div style={styles.cardInfo}>
+                        <div style={styles.cardHeader}>
+                            <span style={styles.cardLabel}>Faturamento</span>
+                            <TrendingUp size={18} color="#FF7A00" />
+                        </div>
+                        <h3 style={styles.cardValor}>R$ {totalFaturado.toFixed(2)}</h3>
+                    </div>
+                    
+                    <div style={styles.cardInfo}>
+                        <div style={styles.cardHeader}>
+                            <span style={styles.cardLabel}>Ticket Médio</span>
+                            <FileText size={18} color="#1976D2" />
+                        </div>
+                        <h3 style={styles.cardValor}>R$ {ticketMedio.toFixed(2)}</h3>
                     </div>
                 </div>
 
-                {/* Log de Auditoria / Histórico de Cupons Lançados */}
-                <h3 style={styles.tituloSecao}>Fluxo de Caixas em Tempo Real</h3>
-                <div style={styles.listaVendasContainer}>
-                    {historicoVendasMock.map((venda) => (
-                        <div key={venda.id} style={styles.cardVendaLog}>
-                            <div style={styles.vendaMetadados}>
-                                <div style={styles.linhaIdHorario}>
-                                    <strong style={styles.vendaId}>{venda.id}</strong>
-                                    <div style={styles.blocoHora}>
-                                        <Clock size={12} color="#7A7A7A" />
-                                        <span>{venda.horario}</span>
-                                    </div>
-                                </div>
-                                <span style={styles.vendaOperador}>Operador: {venda.funcionario}</span>
-                            </div>
-                            
-                            <div style={styles.vendaValoresDireita}>
-                                <strong style={styles.vendaValorTexto}>R$ {venda.valor.toFixed(2)}</strong>
-                                <span style={styles.vendaBadgeMetodo}>{venda.metodo}</span>
-                            </div>
-                        </div>
-                    ))}
+                {/* BLOCO 2: DIVISÃO POR PAGAMENTOS */}
+                <h3 style={styles.tituloBloco}>Receitas por Pagamento</h3>
+                <div style={styles.listaPagamentos}>
+                    <div style={styles.itemPagamento}>
+                        <div style={styles.iconePagamento}><Banknote size={20} color="#FF7A00" /></div>
+                        <span style={styles.nomePagamento}>Dinheiro</span>
+                        <strong style={styles.valorPagamento}>R$ {(pagamentos['DINHEIRO'] || 0).toFixed(2)}</strong>
+                    </div>
+                    <div style={styles.itemPagamento}>
+                        <div style={styles.iconePagamento}><CreditCard size={20} color="#1976D2" /></div>
+                        <span style={styles.nomePagamento}>Cartão</span>
+                        <strong style={styles.valorPagamento}>R$ {(pagamentos['CARTAO'] || 0).toFixed(2)}</strong>
+                    </div>
+                    <div style={styles.itemPagamento}>
+                        <div style={styles.iconePagamento}><QrCode size={20} color="#00B4D8" /></div>
+                        <span style={styles.nomePagamento}>Pix</span>
+                        <strong style={styles.valorPagamento}>R$ {(pagamentos['PIX'] || 0).toFixed(2)}</strong>
+                    </div>
                 </div>
 
-            </div>
+                {/* BLOCO 3: HISTÓRICO DAS ÚLTIMAS VENDAS */}
+                <h3 style={styles.tituloBloco}>Últimas Vendas</h3>
+                <div style={styles.listaVendas}>
+                    {vendas.length === 0 ? (
+                        <div style={styles.mensagemVazia}>Nenhuma venda registada ainda.</div>
+                    ) : (
+                        vendas.map(venda => {
+                            const dataFormatada = new Date(venda.data_venda).toLocaleDateString('pt-BR', {
+                                day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'
+                            });
 
-            {/* ==========================================
-                BLOCO 3: RODAPÉ FIXO (Exportador de Relatório)
-            ========================================== */}
-            <div style={styles.rodapeFixo}>
-                <button style={styles.btnExportar}>
-                    <Download size={20} style={{ marginRight: 8 }} />
-                    Exportar Fechamento de Caixa
-                </button>
+                            return (
+                                <div key={venda.id} style={styles.cardVenda}>
+                                    <div style={styles.vendaIcone}><ShoppingCart size={18} color="#7A7A7A" /></div>
+                                    <div style={styles.vendaDados}>
+                                        <span style={styles.vendaMetodo}>{venda.metodo_pagamento}</span>
+                                        <span style={styles.vendaData}><Calendar size={12} style={{marginRight: 4}}/> {dataFormatada}</span>
+                                    </div>
+                                    <div style={styles.vendaValor}>R$ {Number(venda.total_bruto).toFixed(2)}</div>
+                                </div>
+                            )
+                        })
+                    )}
+                </div>
+
+                {/* BLOCO 4: ALERTAS DE ESTOQUE */}
+                <h3 style={styles.tituloBloco}>Atenção ao Estoque ({estoqueBaixo.length})</h3>
+                <div style={styles.listaVendas}>
+                    {estoqueBaixo.length === 0 ? (
+                        <div style={styles.mensagemVazia}>Nenhum produto a acabar. Tudo OK!</div>
+                    ) : (
+                        estoqueBaixo.map(prod => (
+                            <div key={prod.id} style={styles.cardAlerta}>
+                                <div style={styles.alertaIcone}><AlertTriangle size={18} color="#D32F2F" /></div>
+                                <div style={styles.alertaDados}>
+                                    <span style={styles.alertaNome}>{prod.descricao}</span>
+                                    <span style={styles.alertaDesc}>Apenas {prod.estoque_atual} restantes (Mínimo: {prod.estoque_minimo})</span>
+                                </div>
+                            </div>
+                        ))
+                    )}
+                </div>
+
             </div>
         </div>
     );
 }
 
 // ==========================================
-// ESTILOS: PADRÃO ERGONÔMICO EXCLUSIVO MOBILE
+// ESTILOS
 // ==========================================
+import { ShoppingCart } from 'lucide-react';
+
 const styles = {
     telaTravada: {
         display: 'flex',
         flexDirection: 'column',
         height: '100%', 
-        maxHeight: 'calc(100dvh - 140px)', 
+        maxHeight: 'calc(100dvh - 100px)', 
         backgroundColor: '#F5F6F8',
         overflow: 'hidden', 
     },
-    topoFixo: {
-        flexShrink: 0,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '12px',
-        marginBottom: '15px',
-    },
-    linhaFiltros: {
-        display: 'flex',
-        gap: '8px',
-    },
-    btnFiltro: {
-        flex: 1,
-        height: '38px',
-        border: '1px solid #E0E0E0',
-        borderRadius: '10px',
-        fontSize: '0.85rem',
-        fontWeight: '700',
-        cursor: 'pointer',
-        boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
-        transition: 'all 0.2s',
-    },
-    cardFaturamento: {
-        backgroundColor: '#FFF',
-        borderRadius: '18px',
-        padding: '16px',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        borderLeft: '4px solid #FF7A00',
-    },
-    blocoFaturamentoTexto: {
-        display: 'flex',
-        flexDirection: 'column',
-    },
-    labelFaturamento: {
-        fontSize: '0.8rem',
-        color: '#7A7A7A',
-        fontWeight: '600',
-    },
-    valorFaturamento: {
-        fontSize: '1.4rem',
-        color: '#333',
-        fontWeight: '800',
-        marginTop: '2px',
-    },
-    iconeFundoDolar: {
-        backgroundColor: '#FF7A00',
-        width: '42px',
-        height: '42px',
-        borderRadius: '12px',
+    centro: {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        boxShadow: '0 4px 10px rgba(255, 122, 0, 0.25)',
+        height: '100%',
+        color: '#7A7A7A',
+        fontWeight: '600',
+    },
+    topoFixo: {
+        flexShrink: 0,
+        marginBottom: '15px',
+    },
+    tituloSecao: {
+        fontSize: '1.4rem',
+        fontWeight: '800',
+        color: '#333',
+        marginBottom: '4px',
+    },
+    subtitulo: {
+        fontSize: '0.9rem',
+        color: '#7A7A7A',
     },
     areaRolagemInterna: {
         flex: 1, 
         overflowY: 'auto', 
+        paddingBottom: '20px', 
         display: 'flex',
         flexDirection: 'column',
-        gap: '15px',
-        paddingBottom: '80px', 
+        gap: '20px',
     },
-    cardGestao: {
-        backgroundColor: '#FFF',
-        borderRadius: '18px',
-        padding: '16px',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
-        display: 'flex',
-        flexDirection: 'column',
+    gridDuplo: {
+        display: 'grid',
+        gridTemplateColumns: '1fr 1fr',
         gap: '12px',
     },
-    tituloPainel: {
-        fontSize: '0.85rem',
-        color: '#333',
-        fontWeight: '700',
-    },
-    listaMetodos: {
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '10px',
-    },
-    linhaMetodo: {
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        fontSize: '0.85rem',
-    },
-    metodoIdentificador: {
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px',
-    },
-    indicadorCor: {
-        width: '10px',
-        height: '10px',
-        borderRadius: '50%',
-    },
-    nomeMetodo: {
-        color: '#555',
-        fontWeight: '500',
-    },
-    valorMetodo: {
-        color: '#333',
-    },
-    tituloSecao: {
-        fontSize: '0.85rem',
-        color: '#7A7A7A',
-        fontWeight: '600',
-        marginTop: '5px',
-    },
-    listaVendasContainer: {
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '8px',
-    },
-    cardVendaLog: {
+    cardInfo: {
         backgroundColor: '#FFF',
-        borderRadius: '14px',
-        padding: '12px 14px',
+        borderRadius: '16px',
+        padding: '16px',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+    },
+    cardHeader: {
         display: 'flex',
         justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: '10px',
+    },
+    cardLabel: {
+        fontSize: '0.85rem',
+        fontWeight: '600',
+        color: '#7A7A7A',
+    },
+    cardValor: {
+        fontSize: '1.4rem',
+        fontWeight: '800',
+        color: '#333',
+    },
+    tituloBloco: {
+        fontSize: '1rem',
+        fontWeight: '700',
+        color: '#333',
+        marginBottom: '-10px', 
+    },
+    listaPagamentos: {
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '8px',
+    },
+    itemPagamento: {
+        backgroundColor: '#FFF',
+        borderRadius: '12px',
+        padding: '12px',
+        display: 'flex',
         alignItems: 'center',
         boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
     },
-    vendaMetadados: {
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '2px',
-    },
-    linhaIdHorario: {
-        display: 'flex',
-        alignItems: 'center',
-        gap: '10px',
-    },
-    vendaId: {
-        fontSize: '0.9rem',
-        color: '#333',
-    },
-    blocoHora: {
-        display: 'flex',
-        alignItems: 'center',
-        gap: '4px',
-        fontSize: '0.75rem',
-        color: '#7A7A7A',
-    },
-    vendaOperador: {
-        fontSize: '0.8rem',
-        color: '#7A7A7A',
-    },
-    vendaValoresDireita: {
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'flex-end',
-        gap: '4px',
-    },
-    vendaValorTexto: {
-        fontSize: '0.95rem',
-        color: '#333',
-    },
-    vendaBadgeMetodo: {
-        fontSize: '0.7rem',
+    iconePagamento: {
         backgroundColor: '#F5F6F8',
-        color: '#555',
-        padding: '2px 6px',
-        borderRadius: '6px',
-        fontWeight: '700',
-    },
-    rodapeFixo: {
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        backgroundColor: 'transparent',
-        padding: '16px',
+        padding: '8px',
+        borderRadius: '8px',
         display: 'flex',
-        justifyContent: 'center',
-        pointerEvents: 'none',
+        marginRight: '12px',
     },
-    btnExportar: {
-        pointerEvents: 'auto',
-        width: '100%',
-        maxWidth: '350px',
-        height: '50px',
-        backgroundColor: '#FFF',
-        color: '#FF7A00',
-        border: '2px solid #FF7A00',
-        borderRadius: '14px',
+    nomePagamento: {
+        flex: 1,
+        fontSize: '0.95rem',
+        fontWeight: '600',
+        color: '#333',
+    },
+    valorPagamento: {
         fontSize: '1rem',
-        fontWeight: '700',
-        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.05)',
+        color: '#333',
+    },
+    listaVendas: {
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '8px',
+    },
+    mensagemVazia: {
+        textAlign: 'center',
+        padding: '20px',
+        color: '#A0A0A0',
+        backgroundColor: '#FFF',
+        borderRadius: '12px',
+        fontSize: '0.9rem',
+    },
+    cardVenda: {
+        backgroundColor: '#FFF',
+        borderRadius: '12px',
+        padding: '12px',
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'center',
+        boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
+    },
+    vendaIcone: {
+        backgroundColor: '#F5F6F8',
+        padding: '8px',
+        borderRadius: '8px',
+        marginRight: '12px',
+    },
+    vendaDados: {
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+    },
+    vendaMetodo: {
+        fontSize: '0.9rem',
+        fontWeight: '600',
+        color: '#333',
+    },
+    vendaData: {
+        fontSize: '0.75rem',
+        color: '#A0A0A0',
+        display: 'flex',
+        alignItems: 'center',
+        marginTop: '2px',
+    },
+    vendaValor: {
+        fontWeight: '800',
+        color: '#FF7A00',
+    },
+    cardAlerta: {
+        backgroundColor: '#FFF',
+        borderRadius: '12px',
+        padding: '12px',
+        display: 'flex',
+        alignItems: 'center',
+        borderLeft: '4px solid #D32F2F',
+        boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
+    },
+    alertaIcone: {
+        backgroundColor: '#FFEBEE',
+        padding: '8px',
+        borderRadius: '8px',
+        marginRight: '12px',
+    },
+    alertaDados: {
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+    },
+    alertaNome: {
+        fontSize: '0.9rem',
+        fontWeight: '600',
+        color: '#333',
+    },
+    alertaDesc: {
+        fontSize: '0.75rem',
+        color: '#D32F2F',
+        fontWeight: '600',
+        marginTop: '2px',
     }
 };
