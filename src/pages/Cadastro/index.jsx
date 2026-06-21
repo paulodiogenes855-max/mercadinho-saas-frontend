@@ -43,31 +43,45 @@ export default function Cadastro() {
             // 1. Cria a conta no Firebase
             const credenciais = await createUserWithEmailAndPassword(auth, loja.email, loja.senha);
             
-            // 2. Envia os dados para o seu Backend criar a cobrança
+            // GARANTIA DE SEGURANÇA: Pegamos o token à força diretamente do utilizador recém-criado
+            // Assim não damos hipótese ao sistema de falhar por causa de milissegundos!
+            const tokenDaVez = await credenciais.user.getIdToken();
+
+            // 2. Envia os dados para o seu Backend criar a cobrança (enviando o token à força)
             const resposta = await api.post('/lojas', {
                 nome_loja: loja.nomeLoja,
                 tamanho_equipe: loja.funcionarios,
                 plano_escolhido: pagamento.plano,
                 metodo_pagamento: pagamento.metodo
+            }, {
+                headers: {
+                    Authorization: `Bearer ${tokenDaVez}` // Abre a porta de segurança do backend!
+                }
             });
 
             // 3. REDIRECIONA PARA O MERCADO PAGO (CHECKOUT PRO)
             if (resposta.data.url_pagamento) {
-                // Sai do seu site e abre a tela segura de pagamento do Mercado Pago
                 window.location.href = resposta.data.url_pagamento;
             } else {
-                // Plano B caso algo falhe
                 navigate('/dashboard');
             }
 
         } catch (error) {
             console.error("Erro no cadastro:", error);
+            
+            // TRUQUE DE DETETIVE ATIVADO!
             if (error.code === 'auth/email-already-in-use') {
-                setErro("Este e-mail já possui uma loja registada.");
+                setErro("Este e-mail já possui uma loja. Teste com um e-mail diferente!");
+            } else if (error.code === 'auth/weak-password') {
+                setErro("A palavra-passe é muito fraca. Digite pelo menos 6 letras ou números.");
             } else {
-                setErro("Ocorreu um erro ao criar a loja. Tente novamente.");
+                // Agora, se der erro, ele vai gritar na tela exatamente o que falhou!
+                const erroDoBackend = error.response?.data?.erro || error.response?.data?.message;
+                const erroDeRede = error.message;
+                setErro(`Erro Real: ${erroDoBackend || erroDeRede}`);
             }
-            setCarregando(false); // Só desativa o loading se der erro. Se der certo, ele muda de página.
+            
+            setCarregando(false);
         }
     };
 
